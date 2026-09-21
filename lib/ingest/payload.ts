@@ -5,12 +5,13 @@ import type { ProcessedJob } from "./types";
 export function buildSavePayload(job: ProcessedJob, opts: { documentId?: string | null; isHoldout?: boolean } = {}) {
   const sectionIds = new Map(job.sections.map((s) => [s.ref, randomUUID()]));
   const lineIds = new Map(job.lines.map((l) => [l.ref, l.id]));
+  const orNull = (v: string) => (v && v.trim() ? v.trim() : null);
   return {
     job_number: job.header.job_number,
     title: job.header.title,
-    client_org: job.header.client_org,
-    site_suburb: job.header.site_suburb,
-    issued_on: job.header.issued_on,
+    client_org: orNull(job.header.client_org),
+    site_suburb: orNull(job.header.site_suburb),
+    issued_on: orNull(job.header.issued_on),
     structure: job.header.structure,
     room_type: job.params.room_type,
     install_type: job.params.install_type,
@@ -40,6 +41,6 @@ export function buildSavePayload(job: ProcessedJob, opts: { documentId?: string 
       rate: l.rate,
       sort: l.sort,
     })),
-    optional_items: job.optional_items,
+    optional_items: job.optional_items.map((o) => ({ ...o, part_number: orNull(o.part_number) })),
   };
 }

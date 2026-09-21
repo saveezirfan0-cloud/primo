@@ -41,7 +41,7 @@ export function validate(
     }
 
     const summaryRow = summary.sections.find((x) => norm(x.name) === norm(s.name));
-    const summary_total = summaryRow?.total ?? null;
+    const summary_total = summaryRow && summaryRow.total !== 0 ? summaryRow.total : null;
     const delta_vs_bom = typeof s.total === "number" ? cents(s.leaf_sum - s.total) : null;
     const delta_vs_summary = typeof summary_total === "number" ? cents(s.leaf_sum - summary_total) : null;
 
@@ -63,7 +63,7 @@ export function validate(
 
   const sections_sum = sum(sections.map((s) => s.total ?? s.leaf_sum));
   const leaf_sum = sum(sections.map((s) => s.leaf_sum));
-  const declared = summary.subtotal_ex_gst;
+  const declared = summary.subtotal_ex_gst !== 0 ? summary.subtotal_ex_gst : null;
   const subtotalOk = typeof declared === "number" && within(sections_sum, declared, TOLERANCE.section) && within(leaf_sum, declared, TOLERANCE.section * Math.max(1, sections.length));
   if (!subtotalOk) {
     if (typeof declared !== "number") messages.push("No subtotal ex GST found in Summary Pricing.");
@@ -71,7 +71,7 @@ export function validate(
   }
 
   const expectedGst = typeof declared === "number" ? cents(declared * 0.1) : null;
-  const gstOk = summary.gst === null || expectedGst === null || within(summary.gst, expectedGst, 1);
+  const gstOk = summary.gst === 0 || expectedGst === null || within(summary.gst, expectedGst, 1);
   if (!gstOk) messages.push(`GST ${summary.gst} does not equal 10% of the subtotal (${expectedGst}).`);
 
   const ok = sectionReports.every((s) => s.ok) && subtotalOk && gstOk;

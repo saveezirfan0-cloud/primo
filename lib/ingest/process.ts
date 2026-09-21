@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ExtractedJob } from "@/lib/schemas/extraction";
+import { paramsFromList, type ExtractedJob } from "@/lib/schemas/extraction";
 import type { ProcessedJob, ProcessedLine, ProcessedSection, RateCardEntry } from "./types";
 import { buildSectionTree, leafSum, rollupCode } from "./tree";
 import { deriveHours, tagActivities } from "./labour";
@@ -30,7 +30,7 @@ export function processExtraction(extracted: ExtractedJob, rateCard: RateCardEnt
         depth += 1;
         p = byRef.get(p)?.parent_ref ?? null;
       }
-      const isExisting = (row.part_number ?? "").trim().toUpperCase() === "OFE";
+      const isExisting = row.part_number.trim().toUpperCase() === "OFE";
       lines.push({
         id: randomUUID(),
         ref: row.ref,
@@ -38,11 +38,11 @@ export function processExtraction(extracted: ExtractedJob, rateCard: RateCardEnt
         section_ref: row.section_ref,
         grp: row.grp,
         code: rollupCode(row),
-        part_number: row.part_number?.trim() || null,
+        part_number: row.part_number.trim() && row.part_number.trim() !== "-" ? row.part_number.trim() : null,
         description: row.description.trim(),
         qty: row.qty,
         unit_price: row.unit_price,
-        total: row.total === null ? null : cents(row.total),
+        total: cents(row.total),
         is_existing: isExisting,
         activity: null,
         hours: null,
@@ -59,11 +59,13 @@ export function processExtraction(extracted: ExtractedJob, rateCard: RateCardEnt
 
   const has_labour_detail = lines.some((l) => l.activity && l.is_leaf && l.parent_ref);
   const validation = validate(sections, lines, extracted.summary);
+  const params = paramsFromList(extracted.params);
+  if (params.optional_items_count === null) params.optional_items_count = extracted.optional_items.length;
 
   return {
     header: extracted.header,
     summary: extracted.summary,
-    params: extracted.params,
+    params,
     sections,
     lines,
     optional_items: extracted.optional_items,

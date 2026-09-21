@@ -37,7 +37,7 @@ export function norm(s: string | null | undefined): string {
 }
 
 /** CABLING / CONS / FREIGHT / SERVICES if the row is one of the four roll-ups. */
-export function rollupCode(line: Pick<ExtractedLineItem, "part_number" | "description">): string | null {
+export function rollupCode(line: { part_number: string | null; description: string }): string | null {
   const p = norm(line.part_number);
   if (p in ROLLUP_ALIASES) return ROLLUP_ALIASES[p];
   const d = norm(line.description);
@@ -70,7 +70,7 @@ const ACTIVITY_ALIASES: Record<string, string> = {
 };
 
 /** Activity code if the row is a labour activity roll-up (INSTALL, ENGINEER, ...). */
-export function activityCode(line: Pick<ExtractedLineItem, "part_number" | "description">): string | null {
+export function activityCode(line: { part_number: string | null; description: string }): string | null {
   for (const raw of [line.part_number, line.description]) {
     const n = norm(raw);
     if (!n) continue;
@@ -86,27 +86,36 @@ export function activityCode(line: Pick<ExtractedLineItem, "part_number" | "desc
 
 export type TreeLine = ExtractedLineItem & { parent_ref: string | null };
 
-function isCode(line: ExtractedLineItem): boolean {
-  return rollupCode(line) !== null || activityCode(line) !== null;
+/**
+ * Build parent links from the reported indent depth (stack walk). Returns null
+ * when the depths are unusable (all zero, or a row jumps more than one level).
+ */
+export function treeFromDepth(rows: ExtractedLineItem[]): TreeLine[] | null {
+  if (!rows.some((r) => r.depth > 0)) return null;
+  const out: TreeLine[] = [];
+  const stack: TreeLine[] = [];
+  for (const r of rows) {
+    const depth = Math.max(0, Math.floor(r.depth));
+    if (depth > stack.length) return null;
+    stack.length = depth;
+    const line: TreeLine = { ...r, parent_ref: stack.length ? stack[stack.length - 1].ref : null };
+    out.push(line);
+    stack.push(line);
+  }
+  return out;
 }
 
-/**
- * Check a model-supplied tree: every parent's total must equal the sum of its
- * direct children within the line tolerance, and every parent_ref must exist.
- */
-export function modelTreeIsConsistent(lines: ExtractedLineItem[]): boolean {
+/** Every parent's total must equal the sum of its direct children within the line tolerance. */
+export function parentsReconcile(lines: TreeLine[]): boolean {
   const byRef = new Map(lines.map((l) => [l.ref, l]));
-  const children = new Map<string, ExtractedLineItem[]>();
-  let hasLinks = false;
+  const children = new Map<string, TreeLine[]>();
   for (const l of lines) {
     if (!l.parent_ref) continue;
-    if (!byRef.has(l.parent_ref) || l.parent_ref === l.ref) return false;
-    hasLinks = true;
+    if (!byRef.has(l.parent_ref)) return false;
     const arr = children.get(l.parent_ref) ?? [];
     arr.push(l);
     children.set(l.parent_ref, arr);
   }
-  if (!hasLinks) return false;
   for (const [ref, kids] of children) {
     const parent = byRef.get(ref)!;
     if (!within(parent.total, sum(kids.map((k) => k.total)), TOLERANCE.line)) return false;
@@ -114,12 +123,16 @@ export function modelTreeIsConsistent(lines: ExtractedLineItem[]): boolean {
   return true;
 }
 
+function isCode(line: ExtractedLineItem): boolean {
+  return rollupCode(line) !== null || activityCode(line) !== null;
+}
+
 /**
  * Recursive-descent inference from sums. `rows` is one section in document
  * order. Returns the same rows with parent_ref filled.
  */
 export function inferTreeFromSums(rows: ExtractedLineItem[]): TreeLine[] {
-  const out: TreeLine[] = rows.map((r) => ({ ...r, parent_ref: null }));
+  const out: TreeLine[] = rows.map((r) => ({ ...r, parent_ref: null as string | null }));
 
   // Consume rows from `start` as children of `parentRef` until their totals
   // reach `target`. Returns the index after the last consumed row and the sum.
@@ -170,9 +183,10 @@ export function inferTreeFromSums(rows: ExtractedLineItem[]): TreeLine[] {
   return out;
 }
 
-/** Build the tree for one section: trust the model when consistent, else infer. */
+/** Build the tree for one section: reported depths when they reconcile, else infer from sums. */
 export function buildSectionTree(rows: ExtractedLineItem[]): TreeLine[] {
-  if (modelTreeIsConsistent(rows)) return rows.map((r) => ({ ...r, parent_ref: r.parent_ref ?? null }));
+  const byDepth = treeFromDepth(rows);
+  if (byDepth && parentsReconcile(byDepth)) return byDepth;
   return inferTreeFromSums(rows);
 }
 

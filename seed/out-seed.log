@@ -1,0 +1,9 @@
+
+> primo-estimator@0.1.0 seed
+> tsx --conditions=react-server scripts/seed.ts --offline
+
+◇ injected env (0) from .env
+◇ injected env (6) from .env.local
+Rate card: INSTALL=95.1, CABLING-INSTALL=95.1, RACK-BUILD=95.1, ENGINEER=138, DOCUMENT=138, COMMISSION=138, TRAIN=138, O&M=138, PROGRAM=144, WORKSHOP=144, PROJECT-MANAGE=156
+
+→ Primo_Quote_JN6570_20260814.pdf (pdf) … 

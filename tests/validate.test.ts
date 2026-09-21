@@ -25,6 +25,16 @@ describe("processExtraction + validation (6570 numbers)", () => {
     expect(job.has_labour_detail).toBe(true);
   });
 
+  it("converts the key/value params list into typed params", () => {
+    expect(job.params.room_type).toBe("hall");
+    expect(job.params.staged).toBe(false);
+    expect(job.params.ewp_required).toBe(true);
+    expect(job.params.projector_lumens).toBe(7000);
+    expect(job.params.audio_zones).toEqual(["hall", "COLA"]);
+    expect(job.params.dante).toBeNull();
+    expect(job.params.optional_items_count).toBe(0);
+  });
+
   it("derives hours = total / rate when the rate fits within 1%", () => {
     const hours = Object.fromEntries(job.lines.filter((l) => l.hours !== null).map((l) => [l.ref, l.hours]));
     expect(hours).toEqual({

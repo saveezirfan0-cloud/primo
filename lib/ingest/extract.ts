@@ -12,13 +12,13 @@ Document order: Cover, letter, Scope of Works, Handover, Summary Pricing (sectio
 
 Rules:
 - Ignore everything from "Acceptance & Payment" onward. Never output bank details, phone numbers, email addresses or postal addresses. Client contact is name only.
-- Copy every number exactly as printed. Do not compute, correct, or reconcile totals; code checks the arithmetic afterwards. Use null for blank cells.
-- The Bill of Materials is grouped by section (systems like Video / Audio / Control, stages like Stage 1, or a single section). Output one section per BOM group in order and one line item per BOM row in document order, including OFE (owner-furnished/existing, $0) and CUSTOM rows.
-- Every section normally ends with four roll-up rows: CABLING, CONS (Hardware & Consumables), FREIGHT, SERVICES. Mark them grp accordingly and is_rollup=true.
-- Expanded exports break roll-ups into indented child rows (e.g. SERVICES -> INSTALL -> one row per installed item; CABLING -> cable assemblies, per-metre cable, connectors, Contingency). When the document shows that nesting, set parent_ref to the enclosing roll-up/activity row's ref. Activity rows (DE-COMM, INSTALL, CABLING-INSTALL, RACK-BUILD, ENGINEER, DOCUMENT, COMMISSION, PROGRAM, TRAIN, O&M, PROJECT-MANAGE, RUBBISH, EWASTE, PARKING, TRAVEL+ACCOMM, ACCESS, WORKSHOP) are is_rollup=true with grp SERVICES. If a bundle is listed once and then again broken into its parts, keep both rows and make the parts children of the bundle row.
-- If nesting is not visible, leave parent_ref null. Never invent rows.
+- Copy every number exactly as printed. Do not compute, correct, or reconcile totals; code checks the arithmetic afterwards. A blank money cell is 0; a blank text cell is "".
+- The Bill of Materials is grouped by section (systems like "Hall Upgrade - Video" / Audio / Control, stages like Stage 1, or a single section). Output one section per BOM group in order and one line item per BOM row in document order, including OFE (owner-furnished/existing, $0) and CUSTOM rows. Include the section's own summary row if it appears as a table row (same name as the section, qty 1) at depth 0.
+- Every section normally ends with four roll-up rows: CABLING, CONS (Hardware & Consumables), FREIGHT, SERVICES. Give them grp accordingly and is_rollup=true.
+- Nesting: expanded exports indent nested rows. In text input each indent level is shown by a leading "›" character per level in the Item cell (e.g. "›› Panasonic projector" is depth 2). In PDFs the Item text is visually indented. Report the indent level as depth and strip the markers from description. Typical structure: section row (0) -> Equipment / Cabling / Hardware & Consumables / Freight & Logistics / Services (1) -> items or activity rows such as DE-COMM, INSTALL, CABLING-INSTALL, RACK-BUILD, ENGINEER, DOCUMENT, COMMISSION, PROGRAM, TRAIN, O&M, PROJECT-MANAGE, RUBBISH, EWASTE, PARKING, TRAVEL+ACCOMM, ACCESS, WORKSHOP (2) -> per-item rows (3) -> sub-parts (4). Bundles and cable assemblies also nest their parts one level deeper. Rows nested under an activity row are grp SERVICES; rows nested under Cabling are grp CABLING.
+- If nesting is not visible, use depth 0 for every row. Never invent rows.
 - Scope paragraphs, assumptions and exclusions are verbatim.
-- params describe the job for similarity matching: count new vs retained (OFE) items, mics, inputs, whether an EWP/scissor lift is required, whether pricing is staged, etc. Use null when the document does not say.`;
+- params describe the job for similarity matching: count new vs retained (OFE) items, mics, inputs, whether an EWP/scissor lift is required, whether pricing is staged, etc. Only include keys the document supports.`;
 
 function userContent(doc: PreparedDocument): Anthropic.ContentBlockParam[] {
   const instruction: Anthropic.TextBlockParam = {
@@ -32,7 +32,7 @@ function userContent(doc: PreparedDocument): Anthropic.ContentBlockParam[] {
     ];
   }
   return [
-    { type: "document", source: { type: "text", media_type: "text/plain", data: doc.html }, title: "Proposal (HTML export from Word, truncated before Acceptance & Payment)" },
+    { type: "document", source: { type: "text", media_type: "text/plain", data: doc.text }, title: "Proposal (text export from Word; table rows as 'Item | Part | Quantity | Price Each | Price Total'; truncated before Acceptance & Payment)" },
     instruction,
   ];
 }
