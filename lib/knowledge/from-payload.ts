@@ -51,7 +51,7 @@ export function jobFromPayload(p: Payload, embedding: number[] | null = null): K
       kind: s.kind,
       sort: s.sort,
       total: s.total,
-      lines: p.lines.filter((l) => l.section_id === s.id).map(({ section_id: _s, ...l }) => l),
+      lines: p.lines.filter((l) => l.section_id === s.id).map((l) => { const { section_id, ...rest } = l; void section_id; return rest; }),
     })),
   };
 }

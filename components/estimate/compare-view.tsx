@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -30,8 +31,8 @@ export function CompareView({ cmp }: { cmp: Comparison }) {
           </TableHeader>
           <TableBody>
             {cmp.sections.map((s) => (
-              <>
-                <TableRow key={s.name} className="font-medium">
+              <Fragment key={s.name}>
+                <TableRow className="font-medium">
                   <TableCell>{s.name}</TableCell>
                   <TableCell className="text-right font-mono">{formatAud(s.draft)}</TableCell>
                   <TableCell className="text-right font-mono">{formatAud(s.actual)}</TableCell>
@@ -47,7 +48,7 @@ export function CompareView({ cmp }: { cmp: Comparison }) {
                     <TableCell className="text-right">{g.pct === null ? "" : `${g.pct > 0 ? "+" : ""}${g.pct.toFixed(0)}%`}</TableCell>
                   </TableRow>
                 ))}
-              </>
+              </Fragment>
             ))}
             <TableRow className="bg-muted/40 font-semibold">
               <TableCell>Subtotal ex GST</TableCell>

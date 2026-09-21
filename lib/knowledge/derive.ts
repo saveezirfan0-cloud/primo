@@ -70,7 +70,7 @@ export function derivePriceBook(jobs: KJob[]): PartRecord[] {
       }
     }
   }
-  return [...byPart.values()].map(({ _seen: _unused, ...p }) => p).sort((a, b) => b.times_used - a.times_used || a.part_number.localeCompare(b.part_number));
+  return [...byPart.values()].map((p) => { const { _seen, ...rest } = p; void _seen; return rest; }).sort((a, b) => b.times_used - a.times_used || a.part_number.localeCompare(b.part_number));
 }
 
 const PER_ITEM_ACTIVITIES = new Set(["INSTALL", "CABLING-INSTALL", "DE-COMM"]);
