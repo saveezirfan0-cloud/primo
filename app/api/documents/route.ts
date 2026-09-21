@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { detectKind } from "@/lib/ingest/prepare";
 import { uploadDocument } from "@/lib/ingest/storage";
-import { ingestBuffer, loadRateCard } from "@/lib/ingest/pipeline";
+import { ingestBuffer } from "@/lib/ingest/pipeline";
+import { loadRateCard } from "@/lib/ingest/rate-card";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

@@ -4,12 +4,14 @@
  *   npm run seed            # 6570 pdf, 6570 docx (expanded, becomes latest revision), 6401, 6521
  *   npm run seed -- --force # save even when the arithmetic check fails
  *   npm run seed -- --dry   # extract + validate only, no writes
+ *   npm run seed -- --offline # no DB access: use the default rate card and write
+ *                             # save_job payloads to seed/out/*.json for manual loading
  *
  * 6427 (the holdout) is never seeded here. Nothing is marked as holdout.
  */
 import "dotenv/config";
 import { config } from "dotenv";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 config({ path: ".env.local", override: false });
@@ -17,6 +19,8 @@ config({ path: ".env.local", override: false });
 const args = new Set(process.argv.slice(2));
 const FORCE = args.has("--force");
 const DRY = args.has("--dry");
+const OFFLINE = args.has("--offline");
+const OUT_DIR = path.join(process.cwd(), "seed", "out");
 
 const DOCS_DIR = path.join(process.cwd(), "seed", "docs");
 const HOLDOUT = "6427";
@@ -25,11 +29,15 @@ const HOLDOUT = "6427";
 const ORDER = ["6570_2026", "6570__1_", "6401", "6521"];
 
 async function main() {
-  const { loadRateCard, ingestBuffer } = await import("../lib/ingest/pipeline");
-  const { saveProcessedJob } = await import("../lib/ingest/save");
-  const { supabaseAdmin } = await import("../lib/supabase/server");
+  const { ingestBuffer } = await import("../lib/ingest/pipeline");
   const { detectKind } = await import("../lib/ingest/prepare");
-  const { uploadDocument } = await import("../lib/ingest/storage");
+  const { buildSavePayload } = await import("../lib/ingest/payload");
+  const { DEFAULT_RATE_CARD } = await import("../lib/ingest/rate-card-default");
+  const online = !OFFLINE && !DRY;
+  const db = online ? await import("../lib/supabase/server") : null;
+  const rc = online ? await import("../lib/ingest/rate-card") : null;
+  const sv = online ? await import("../lib/ingest/save") : null;
+  const st = online ? await import("../lib/ingest/storage") : null;
 
   const files = (await readdir(DOCS_DIR).catch(() => [] as string[]))
     .filter((f) => detectKind(f) !== null)
@@ -40,7 +48,8 @@ async function main() {
   }
   files.sort((a, b) => rank(a) - rank(b));
 
-  const rateCard = await loadRateCard();
+  const rateCard = rc ? await rc.loadRateCard() : DEFAULT_RATE_CARD;
+  if (OFFLINE) await mkdir(OUT_DIR, { recursive: true });
   console.log(`Rate card: ${rateCard.filter((r) => r.unit === "hour").map((r) => `${r.code}=${r.rate}`).join(", ")}\n`);
 
   let failures = 0;
@@ -77,19 +86,25 @@ async function main() {
       }
 
       if (DRY) continue;
+      if (OFFLINE) {
+        const outFile = path.join(OUT_DIR, file.replace(/\.(pdf|docx)$/i, "") + ".json");
+        await writeFile(outFile, JSON.stringify({ file, kind, validation: v, meta: out.meta, raw: out.raw, processed: job, payload: buildSavePayload(job) }, null, 2));
+        console.log(`   → wrote ${path.relative(process.cwd(), outFile)}${v.ok ? "" : " (does not reconcile)"}\n`);
+        continue;
+      }
       if (!v.ok && !FORCE) {
         failures += 1;
         console.log("   ✗ not saved (does not reconcile). Re-run with --force to save anyway.\n");
         continue;
       }
-      const storagePath = await uploadDocument(buffer, file, kind === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-      const { data: doc, error } = await supabaseAdmin()
+      const storagePath = await st!.uploadDocument(buffer, file, kind === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      const { data: doc, error } = await db!.supabaseAdmin()
         .from("documents")
         .insert({ kind, storage_path: storagePath, file_name: file, status: "extracted", extraction: { raw: out.raw, processed: job, meta: out.meta }, validation: v })
         .select("id")
         .single();
       if (error || !doc) throw new Error(error?.message ?? "document insert failed");
-      const jobId = await saveProcessedJob(job, { documentId: doc.id, isHoldout: false });
+      const jobId = await sv!.saveProcessedJob(job, { documentId: doc.id, isHoldout: false });
       console.log(`   ✓ saved job ${jobId}\n`);
     } catch (e) {
       failures += 1;
