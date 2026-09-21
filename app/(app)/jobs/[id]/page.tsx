@@ -55,7 +55,7 @@ export default async function JobPage({ params }: PageProps<"/jobs/[id]">) {
     <>
       <PageHeader
         title={`${job.job_number} · ${job.title}`}
-        description={`${job.client_org ?? ""}${job.site_suburb ? ` · ${job.site_suburb}` : ""}${job.issued_on ? ` · issued ${job.issued_on}` : ""} · revision ${job.revision}`}
+        description={[job.client_org, job.site_suburb, job.issued_on ? `issued ${job.issued_on}` : null, `revision ${job.revision}`].filter(Boolean).join(" · ")}
         actions={
           <div className="flex gap-2">
             {job.has_labour_detail && <Badge variant="secondary">labour detail</Badge>}

@@ -19,6 +19,6 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/estimates/[id]/
   rows.push(["Subtotal (EX GST)", "", "", "", est.draft.totals.subtotal.toFixed(2)].join(","));
   rows.push(["Total GST Portion", "", "", "", est.draft.totals.gst.toFixed(2)].join(","));
   rows.push(["Total (INC GST)", "", "", "", est.draft.totals.total.toFixed(2)].join(","));
-  const name = (est.spec?.title ?? "estimate").replace(/[^A-Za-z0-9]+/g, "_");
+  const name = (est.spec?.title?.trim() || "estimate").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "estimate";
   return new NextResponse(rows.join("\r\n"), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}_BOM.csv"` } });
 }

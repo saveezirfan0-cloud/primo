@@ -26,6 +26,12 @@ export function UploadForm() {
     setStage("Uploading and extracting with Claude. This usually takes 30–90 seconds…");
     try {
       const res = await fetch("/api/documents", { method: "POST", body: form });
+      const isJson = res.headers.get("content-type")?.includes("application/json") ?? false;
+      if (!isJson) {
+        if (res.status === 413) throw new Error("That file is too large for the upload endpoint (limit about 4.5 MB). Try the PDF export, or a smaller file.");
+        if (res.status === 504) throw new Error("Extraction timed out. Try again; long documents can take a couple of minutes.");
+        throw new Error(`Upload failed (${res.status}).`);
+      }
       const json = (await res.json()) as { id?: string; error?: string };
       if (!res.ok || !json.id) throw new Error(json.error ?? "Upload failed.");
       setStage("Extracted. Opening the review screen…");

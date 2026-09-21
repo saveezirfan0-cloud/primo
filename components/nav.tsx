@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, FilePlus2, Library } from "lucide-react";
+import { BookOpen, Clock3, FilePlus2, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/library", label: "Library", icon: Library },
   { href: "/price-book", label: "Price Book", icon: BookOpen },
+  { href: "/rate-card", label: "Rate Card", icon: Clock3 },
   { href: "/estimates/new", label: "New Estimate", icon: FilePlus2 },
 ];
 

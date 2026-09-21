@@ -10,7 +10,10 @@ import { updateRateCard } from "./actions";
 
 export const metadata = { title: "Rate card" };
 
-export default async function RateCardPage() {
+export default async function RateCardPage({ searchParams }: PageProps<"/rate-card">) {
+  const sp = await searchParams;
+  const saved = sp.saved === "1";
+  const formError = typeof sp.error === "string" && sp.error ? sp.error : null;
   if (!supabaseConfigured()) return <EmptyState title="Supabase is not configured" />;
   const { data: rates, error } = await supabaseAdmin().from("rate_card").select("*").order("code");
   if (error) return <EmptyState title="Rate card unavailable">{error.message}</EmptyState>;
@@ -50,14 +53,18 @@ export default async function RateCardPage() {
                       </select>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Input name={`rate:${r.code}`} defaultValue={r.rate === null ? "" : String(r.rate)} inputMode="decimal" className="ml-auto w-28 text-right font-mono" />
+                      <Input name={`rate:${r.code}`} type="number" min={0} step="0.01" defaultValue={r.rate === null ? "" : String(r.rate)} inputMode="decimal" className="ml-auto w-28 text-right font-mono" />
                     </TableCell>
                     <TableCell className="max-w-[360px] whitespace-normal text-xs text-muted-foreground">{r.notes}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-            <Button type="submit">Save rates</Button>
+            <div className="flex items-center gap-3">
+              <Button type="submit">Save rates</Button>
+              {saved && <span className="text-sm text-muted-foreground">Saved. New drafts use these rates; existing drafts keep theirs until regenerated.</span>}
+              {formError && <span className="text-sm text-destructive">{formError}</span>}
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -63,12 +63,13 @@ export async function saveSpec(id: string, spec: Spec): Promise<MatchResult[]> {
 
 export async function loadDraftContext(matches: MatchResult[]): Promise<DraftContext> {
   const db = supabaseAdmin();
-  const [parts, standards, profiles, rateCard, matchedJobs] = await Promise.all([
+  const [parts, standards, profiles, rateCard, matchedJobs, labourJobs] = await Promise.all([
     db.from("parts").select("*"),
     db.from("labour_standards").select("*"),
     db.from("section_profiles").select("*"),
     loadRateCard(),
     loadJobs({ jobNumbers: matches.map((m) => m.job_number) }),
+    db.from("jobs").select("job_number").eq("status", "active").eq("is_holdout", false).eq("has_labour_detail", true).order("job_number"),
   ]);
   if (parts.error) throw new Error(parts.error.message);
   if (standards.error) throw new Error(standards.error.message);
@@ -81,6 +82,7 @@ export async function loadDraftContext(matches: MatchResult[]): Promise<DraftCon
     rateCard,
     matches,
     matchedJobs: matchedJobs.sort((a, b) => (order.get(a.job_number) ?? 9) - (order.get(b.job_number) ?? 9)),
+    labourSourceJobs: [...new Set((labourJobs.data ?? []).map((j) => j.job_number))],
   };
 }
 

@@ -1,6 +1,6 @@
 # Demo brief (holdout test against job 6427)
 
-Paste this into **New Estimate** once Phase 3 is deployed. It describes Mount Pritchard East PS in plain
+Paste this into **New Estimate**. It describes Mount Pritchard East PS in plain
 estimator language; the draft it produces is compared against the real 6427 quote ($31,993.40 ex GST).
 
 > School hall upgrade, Mount Pritchard East PS. Replace the old projector with a ~6,500 lm laser projector

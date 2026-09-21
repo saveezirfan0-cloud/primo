@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ProvenanceBadge } from "./provenance";
 import { formatAud } from "@/lib/utils";
 import type { Draft, DraftLine } from "@/lib/draft/types";
-import { draftTotals, recomputeLine, sectionTotals } from "@/lib/draft/totals";
+import { draftTotals, r2, recomputeLine, sectionTotals } from "@/lib/draft/totals";
 import { saveDraftAction } from "@/app/(app)/estimates/actions";
 
 const GROUP_ORDER: DraftLine["grp"][] = ["EQUIPMENT", "CABLING", "CONS", "FREIGHT", "SERVICES"];
@@ -23,18 +23,29 @@ export function DraftEditor({ id, initial, compareJobNumber, holdoutOptions }: {
   const [saving, start] = useTransition();
 
   const totals = useMemo(() => draftTotals(draft.sections), [draft]);
+  const [unsaved, setUnsaved] = useState(false);
 
   const setLine = (sectionRef: string, lineId: string, patch: Partial<DraftLine>) => {
+    setUnsaved(true);
     setDraft((d) => {
       const sections = d.sections.map((s) => {
         if (s.ref !== sectionRef) return s;
-        const lines = s.lines.map((l) => (l.id === lineId ? recomputeLine({ ...l, ...patch }) : l));
+        const lines = s.lines.map((l) => {
+          if (l.id !== lineId) return l;
+          // Hourly labour lines: a quantity change scales the hours (hours per unit stays fixed).
+          if (patch.qty !== undefined && l.hours !== null && l.rate !== null && l.qty > 0 && patch.qty >= 0) {
+            const perUnit = l.hours / l.qty;
+            return recomputeLine({ ...l, ...patch, hours: r2(perUnit * patch.qty) });
+          }
+          return recomputeLine({ ...l, ...patch });
+        });
         return { ...s, lines, totals: sectionTotals(lines) };
       });
       return { ...d, sections, totals: draftTotals(sections) };
     });
   };
-  const removeLine = (sectionRef: string, lineId: string) =>
+  const removeLine = (sectionRef: string, lineId: string) => {
+    setUnsaved(true);
     setDraft((d) => {
       const sections = d.sections.map((s) => {
         if (s.ref !== sectionRef) return s;
@@ -43,11 +54,13 @@ export function DraftEditor({ id, initial, compareJobNumber, holdoutOptions }: {
       });
       return { ...d, sections, totals: draftTotals(sections) };
     });
+  };
 
   const save = () =>
     start(async () => {
       const r = await saveDraftAction(id, { ...draft, totals }, compare || null);
       setMsg(r.ok ? "Saved." : r.message ?? "Save failed");
+      if (r.ok) setUnsaved(false);
     });
 
   return (
@@ -138,9 +151,13 @@ export function DraftEditor({ id, initial, compareJobNumber, holdoutOptions }: {
               </select>
             </label>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" asChild>
-                <a href={`/api/estimates/${id}/csv`} download><Download /> CSV (Primo BOM)</a>
-              </Button>
+              {unsaved ? (
+                <Button type="button" variant="outline" disabled title="Save the estimate first; the CSV exports the saved draft"><Download /> CSV (Primo BOM)</Button>
+              ) : (
+                <Button type="button" variant="outline" asChild>
+                  <a href={`/api/estimates/${id}/csv`} download><Download /> CSV (Primo BOM)</a>
+                </Button>
+              )}
               <Button type="button" onClick={save} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : <Save />} Save estimate</Button>
             </div>
             {msg && <span className="text-xs text-muted-foreground">{msg}</span>}

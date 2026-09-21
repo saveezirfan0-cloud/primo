@@ -11,4 +11,6 @@ export type DraftContext = {
   matches: MatchResult[];
   /** Full data of the matched jobs (for text drafting and candidate parts). */
   matchedJobs: KJob[];
+  /** Library jobs with per-item labour detail, i.e. where the labour standards came from. */
+  labourSourceJobs?: string[];
 };

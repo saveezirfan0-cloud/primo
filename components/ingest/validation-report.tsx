@@ -25,7 +25,7 @@ export function ValidationReportView({ report }: { report: ValidationReport }) {
             </span>
             <span className="flex items-center gap-3 font-mono text-xs">
               <span>{formatAud(s.leaf_sum)}</span>
-              {s.delta_vs_bom !== null && s.delta_vs_bom !== 0 && <span className="text-destructive">Δ {s.delta_vs_bom.toFixed(2)}</span>}
+              {s.delta_vs_bom !== null && s.delta_vs_bom !== 0 && <span className="text-destructive">Δ {formatAud(s.delta_vs_bom)}</span>}
               <Badge variant={s.ok ? "success" : "destructive"}>{s.ok ? "pass" : "fail"}</Badge>
             </span>
           </li>
@@ -34,7 +34,7 @@ export function ValidationReportView({ report }: { report: ValidationReport }) {
           <span>Subtotal ex GST</span>
           <span className="flex items-center gap-3 font-mono text-xs">
             <span>{formatAud(report.subtotal.sections_sum)}</span>
-            {report.subtotal.delta !== null && report.subtotal.delta !== 0 && <span className="text-destructive">Δ {report.subtotal.delta.toFixed(2)}</span>}
+            {report.subtotal.delta !== null && report.subtotal.delta !== 0 && <span className="text-destructive">Δ {formatAud(report.subtotal.delta)}</span>}
             <Badge variant={report.subtotal.ok ? "success" : "destructive"}>{report.subtotal.ok ? "pass" : "fail"}</Badge>
           </span>
         </li>

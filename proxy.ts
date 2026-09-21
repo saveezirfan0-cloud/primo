@@ -6,7 +6,7 @@ import { AUTH_COOKIE, isValidSession } from "@/lib/auth";
  * cookie when DEMO_PASSWORD is set. Static assets are excluded by the matcher.
  */
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   const authed = await isValidSession(request.cookies.get(AUTH_COOKIE)?.value);
 
   if (pathname === "/login") {
@@ -16,7 +16,7 @@ export async function proxy(request: NextRequest) {
 
   if (!authed) {
     const login = new URL("/login", request.url);
-    if (pathname !== "/") login.searchParams.set("next", pathname);
+    if (pathname !== "/") login.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(login);
   }
 

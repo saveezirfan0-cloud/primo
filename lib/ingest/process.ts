@@ -19,7 +19,7 @@ export function processExtraction(extracted: ExtractedJob, rateCard: RateCardEnt
     const rows = extracted.line_items.filter((l) => l.section_ref === section.ref);
     const tree = buildSectionTree(rows);
     const ls = leafSum(tree);
-    sections.push({ ref: section.ref, name: section.name, kind: section.kind, total: section.total, leaf_sum: ls });
+    sections.push({ ref: section.ref, name: section.name, kind: section.kind, total: section.total !== 0 ? section.total : null, leaf_sum: ls });
 
     const parents = new Set(tree.filter((r) => r.parent_ref).map((r) => r.parent_ref!));
     const byRef = new Map(tree.map((r) => [r.ref, r]));

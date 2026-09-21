@@ -12,6 +12,8 @@ import { supabaseAdmin } from "@/lib/supabase/server";
 import { compareDraft } from "@/lib/draft/compare";
 
 export const metadata = { title: "Estimate" };
+// Draft generation runs three Claude calls from a server action on this page.
+export const maxDuration = 300;
 
 export default async function EstimatePage({ params }: PageProps<"/estimates/[id]">) {
   const { id } = await params;
@@ -47,7 +49,7 @@ export default async function EstimatePage({ params }: PageProps<"/estimates/[id
         {est.draft && (
           <>
             {cmp && <CompareView cmp={cmp} />}
-            <DraftEditor id={id} initial={est.draft} compareJobNumber={est.compare_job_number} holdoutOptions={holdoutOptions} />
+            <DraftEditor key={est.draft.generated_at} id={id} initial={est.draft} compareJobNumber={est.compare_job_number} holdoutOptions={holdoutOptions} />
             <JobText scope={est.draft.text.scope_paragraphs.join("\n\n")} assumptions={est.draft.text.assumptions} exclusions={est.draft.text.exclusions} />
             <HowBuilt draft={est.draft} />
           </>

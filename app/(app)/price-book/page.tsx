@@ -20,7 +20,9 @@ async function load(q: string): Promise<{ parts: PartRow[]; standards: LabourSta
   if (!supabaseConfigured()) return { parts: [], standards: [], error: "Supabase is not configured." };
   const db = supabaseAdmin();
   let query = db.from("parts").select("*").order("times_used", { ascending: false }).order("part_number").limit(300);
-  if (q) query = query.or(`part_number.ilike.%${q}%,description.ilike.%${q}%,brand.ilike.%${q}%,category.ilike.%${q}%`);
+  // PostgREST filter grammar: commas, parentheses and dots are separators, so they cannot be part of the pattern.
+  const safe = q.replace(/[,().]/g, " ").trim();
+  if (safe) query = query.or(`part_number.ilike.%${safe}%,description.ilike.%${safe}%,brand.ilike.%${safe}%,category.ilike.%${safe}%`);
   const [parts, standards] = await Promise.all([query, db.from("labour_standards").select("*")]);
   return { parts: parts.data ?? [], standards: standards.data ?? [], error: parts.error?.message ?? standards.error?.message };
 }

@@ -16,7 +16,9 @@ npm run dev
 ```
 Put the sample proposals in `seed/docs/` (gitignored). See `seed/README.md`.
 
-Scripts: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run seed`.
+Scripts: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run seed`,
+`npm run reprocess` (re-run post-processing on saved extractions), `npm run knowledge` (rebuild the price book
+from `seed/out`), `npm run demo` (holdout test: draft the demo brief and compare it to 6427).
 
 ## Ingestion (Phase 1)
 - **Upload** (`/upload`): the file goes to the private `documents` bucket, Claude (`claude-sonnet-5`,
@@ -33,7 +35,9 @@ Scripts: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`, `n
 - **Seed**: `npm run seed` ingests the four library documents from `seed/docs` (6570 PDF first, then
   the expanded 6570 .docx so it is the active revision, then 6401 and 6521), prints the validation
   report and 6570's derived hours, and only saves documents that reconcile (`--force` overrides,
-  `--dry` skips writes). 6427 is never seeded.
+  `--dry` skips writes, `--only=<job>` limits the run, `--offline` writes `save_job` payloads to `seed/out`
+  instead of touching the database). 6427 is only loaded with `--holdout`, which flags it `is_holdout` so it
+  stays out of matching and the price book.
 - Tests: `npm run test` covers tree inference, bundle de-duplication, validation and hour
   derivation with the 6570 figures documented in CLAUDE.md.
 
@@ -49,8 +53,8 @@ npx supabase db push
 
 The first migration enables `vector` and `pg_trgm`, creates all tables with RLS enabled (no anon
 policies: all access is server-side via the service role key), creates the private `documents`
-storage bucket, seeds `rate_card` with the hypothesis rates, and installs a stub `match_jobs`
-function that Phase 2 replaces.
+storage bucket, seeds `rate_card` with the hypothesis rates, and installs a placeholder `match_jobs`
+function. Matching runs in TypeScript (`lib/match/score.ts`); the SQL function is unused.
 
 ## Knowledge layer, matching and drafting (Phases 2–4)
 - `lib/knowledge/`: price book (latest price per part, custom items keyed by category), labour standards

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -42,8 +43,10 @@ function toSections(job: ProcessedJob): BomSectionView[] {
   });
 }
 
-export default async function ReviewPage({ params }: PageProps<"/documents/[id]">) {
+export default async function ReviewPage({ params, searchParams }: PageProps<"/documents/[id]">) {
   const { id } = await params;
+  const sp = await searchParams;
+  const actionError = typeof sp.error === "string" && sp.error ? sp.error : null;
   const { data: doc } = await supabaseAdmin().from("documents").select("*").eq("id", id).single();
   if (!doc) notFound();
 
@@ -63,6 +66,9 @@ export default async function ReviewPage({ params }: PageProps<"/documents/[id]"
   const job = extraction.processed;
   const sections = toSections(job);
   const labourHours = job.lines.filter((l) => l.hours !== null).reduce((a, l) => a + (l.hours ?? 0), 0);
+  // A re-upload of a job that is already a holdout stays a holdout unless the box is unticked.
+  const { data: previous } = await supabaseAdmin().from("jobs").select("is_holdout").eq("job_number", job.header.job_number).eq("status", "active").maybeSingle();
+  const holdoutDefault = previous?.is_holdout ?? false;
 
   return (
     <>
@@ -71,7 +77,12 @@ export default async function ReviewPage({ params }: PageProps<"/documents/[id]"
         description={`${doc.file_name} · ${job.header.is_expanded_export ? "expanded export" : "standard proposal"} · ${job.header.client_org ?? ""} ${job.header.site_suburb ? `· ${job.header.site_suburb}` : ""}`}
         actions={
           doc.status === "confirmed" ? (
-            <Badge variant="success">Saved</Badge>
+            <div className="flex items-center gap-3">
+              <Badge variant="success">Saved</Badge>
+              {doc.job_id && <Link href={`/jobs/${doc.job_id}`} className="text-sm underline">Open job</Link>}
+            </div>
+          ) : doc.status === "discarded" ? (
+            <Badge variant="outline">Discarded</Badge>
           ) : (
             <div className="flex items-center gap-2">
               <form action={discardDocument}>
@@ -81,7 +92,7 @@ export default async function ReviewPage({ params }: PageProps<"/documents/[id]"
               <form action={confirmDocument} className="flex items-center gap-3">
                 <input type="hidden" name="document_id" value={doc.id} />
                 <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <input type="checkbox" name="is_holdout" /> holdout (exclude from matching)
+                  <input type="checkbox" name="is_holdout" defaultChecked={holdoutDefault} /> holdout (exclude from matching)
                 </label>
                 <Button type="submit" variant={job.validation.ok ? "default" : "destructive"}>
                   {job.validation.ok ? "Confirm and save" : "Save anyway"}
@@ -92,6 +103,11 @@ export default async function ReviewPage({ params }: PageProps<"/documents/[id]"
         }
       />
 
+      {actionError && (
+        <Card className="mb-6 border-destructive/40">
+          <CardContent className="text-sm text-destructive">{actionError}</CardContent>
+        </Card>
+      )}
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           {sections.map((s) => (

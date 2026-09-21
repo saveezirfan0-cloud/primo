@@ -10,7 +10,13 @@ import type { MatchResult } from "@/lib/match/score";
 export async function startEstimate(formData: FormData) {
   const brief = String(formData.get("brief") ?? "").trim();
   if (brief.length < 20) redirect("/estimates/new?error=short");
-  const id = await createEstimateFromBrief(brief);
+  let id: string;
+  try {
+    id = await createEstimateFromBrief(brief);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Parsing failed.";
+    redirect(`/estimates/new?error=${encodeURIComponent(message.slice(0, 300))}&brief=${encodeURIComponent(brief.slice(0, 4000))}`);
+  }
   redirect(`/estimates/${id}`);
 }
 

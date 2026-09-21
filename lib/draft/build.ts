@@ -143,6 +143,8 @@ export function buildDraft(spec: Spec, ctx: DraftContext, choices: PartChoice[])
   const ratio_sources: Draft["ratio_sources"] = [];
   const installRate = rateFor(ctx, "INSTALL") ?? 95.1;
   const cablingRate = rateFor(ctx, "CABLING-INSTALL") ?? installRate;
+  // Jobs whose per-item labour detail produced the labour standards (for provenance badges).
+  const labourSource = ctx.labourSourceJobs && ctx.labourSourceJobs.length ? ctx.labourSourceJobs.join(", ") : null;
   const allProfiles = ctx.profiles;
   let accessPlaced = false;
   let rubbishPlaced = false;
@@ -173,14 +175,17 @@ export function buildDraft(spec: Spec, ctx: DraftContext, choices: PartChoice[])
 
     // ---- Ratio-based materials: CABLING, CONS, FREIGHT ----
     const tmplEq = template && template.equipment_value > 0 ? template.equipment_value : null;
+    // A template section with no equipment value cannot give ratios; use library defaults instead of zeros.
+    const useTemplate = Boolean(template && tmplEq);
+    if (template && !tmplEq) warnings.push(`${section.name}: template ${template.job_number} · ${template.section_name} has no equipment value; cabling, consumables and freight use library default ratios.`);
     const ratio = (v: number) => (tmplEq ? v / tmplEq : 0);
-    const cablingRatio = template ? ratio(template.cabling) : 0.03;
-    const consRatio = template ? ratio(template.cons) : 0.07;
-    const freightRatio = template ? ratio(template.freight) : 0.03;
-    const servicesRatio = template ? ratio(template.services) : 0.6;
-    const base = template ? baseUnitOf(template.cons, template.freight) : null;
+    const cablingRatio = useTemplate && template ? ratio(template.cabling) : 0.03;
+    const consRatio = useTemplate && template ? ratio(template.cons) : 0.07;
+    const freightRatio = useTemplate && template ? ratio(template.freight) : 0.03;
+    const servicesRatio = useTemplate && template ? ratio(template.services) : 0.6;
+    const base = useTemplate && template ? baseUnitOf(template.cons, template.freight) : null;
     const roundBase = (v: number) => (base ? Math.max(base, Math.round(v / base) * base) : r2(v));
-    const tmplLabel = template ? `${template.job_number} · ${template.section_name}` : "library defaults";
+    const tmplLabel = useTemplate && template ? `${template.job_number} · ${template.section_name}` : "library defaults";
     ratio_sources.push({ section: section.name, template: tmplLabel, cabling_ratio: r2(cablingRatio * 100) / 100, cons_ratio: r2(consRatio * 100) / 100, freight_ratio: r2(freightRatio * 100) / 100, services_ratio: r2(servicesRatio * 100) / 100 });
 
     const ratioNote = (what: string, r: number) => `${what} at ${(r * 100).toFixed(1)}% of section equipment value, ratio taken from ${tmplLabel}`;
@@ -194,7 +199,7 @@ export function buildDraft(spec: Spec, ctx: DraftContext, choices: PartChoice[])
       const fallback = ctx.standards.find((s) => !s.part_number && s.category === "other" && s.activity === "DE-COMM");
       const amount = std?.amount ?? fallback?.amount ?? DEFAULT_DECOMM_AMOUNT;
       const conf: Confidence = level === "part" ? "high" : level === "category" ? "medium" : "low";
-      lines.push(line({ section_ref: section.ref, grp: "SERVICES", part_number: null, description: `${ACTIVITY_LABELS["DE-COMM"]}: ${c.description}`, qty: c.qty, unit_price: amount, is_existing: false, activity: "DE-COMM", hours: null, rate: null, basis: "matched_job", source_job_number: "6570", confidence: conf, note: level === "none" ? "Default de-commissioning allowance per item" : `Per-item de-commissioning amount from labour standards (${level})`, component_ref: c.ref }));
+      lines.push(line({ section_ref: section.ref, grp: "SERVICES", part_number: null, description: `${ACTIVITY_LABELS["DE-COMM"]}: ${c.description}`, qty: c.qty, unit_price: amount, is_existing: false, activity: "DE-COMM", hours: null, rate: null, basis: level === "none" ? "ai_guess" : "matched_job", source_job_number: level === "none" ? null : labourSource, confidence: conf, note: level === "none" ? "Default de-commissioning allowance per item" : `Per-item de-commissioning amount from labour standards (${level})`, component_ref: c.ref }));
     }
 
     // ---- Labour: INSTALL per new item (+ small allowance for retained items being re-integrated) ----
@@ -202,7 +207,7 @@ export function buildDraft(spec: Spec, ctx: DraftContext, choices: PartChoice[])
       const comp = comps.find((c) => c.ref === l.component_ref);
       if (!comp) continue;
       if (l.is_existing) {
-        lines.push(line({ section_ref: section.ref, grp: "SERVICES", part_number: l.part_number, description: `${ACTIVITY_LABELS.INSTALL}: ${l.description}`, qty: l.qty, unit_price: r2(RETAINED_INTEGRATION_HOURS * installRate), total: r2(RETAINED_INTEGRATION_HOURS * l.qty * installRate), is_existing: true, activity: "INSTALL", hours: r2(RETAINED_INTEGRATION_HOURS * l.qty), rate: installRate, basis: "rate_card", source_job_number: "6570", confidence: "low", note: "Re-integration allowance for retained equipment (0.5 h each, as in 6570)", component_ref: comp.ref }));
+        lines.push(line({ section_ref: section.ref, grp: "SERVICES", part_number: l.part_number, description: `${ACTIVITY_LABELS.INSTALL}: ${l.description}`, qty: l.qty, unit_price: r2(RETAINED_INTEGRATION_HOURS * installRate), total: r2(RETAINED_INTEGRATION_HOURS * l.qty * installRate), is_existing: true, activity: "INSTALL", hours: r2(RETAINED_INTEGRATION_HOURS * l.qty), rate: installRate, basis: "rate_card", source_job_number: labourSource, confidence: "low", note: `Re-integration allowance for retained equipment (0.5 h each${labourSource ? `, as in ${labourSource}` : ""})`, component_ref: comp.ref }));
         continue;
       }
       const cat = l.part_number ? categorise(l.description, l.part_number) : comp.category;
@@ -210,7 +215,8 @@ export function buildDraft(spec: Spec, ctx: DraftContext, choices: PartChoice[])
       const perUnit = std?.hours && std.hours > 0 ? std.hours : DEFAULT_INSTALL_HOURS;
       const hours = roundHours(perUnit * l.qty);
       const conf: Confidence = level === "part" ? "high" : level === "category" ? "medium" : "low";
-      lines.push(line({ section_ref: section.ref, grp: "SERVICES", part_number: l.part_number, description: `${ACTIVITY_LABELS.INSTALL}: ${l.description}`, qty: l.qty, unit_price: r2(perUnit * installRate), total: r2(hours * installRate), is_existing: false, activity: "INSTALL", hours, rate: installRate, basis: "rate_card", source_job_number: level === "none" ? null : "6570", confidence: conf, note: level === "part" ? `${perUnit} h per unit from this part's history` : level === "category" ? `${perUnit} h per unit, median for ${cat.replace(/_/g, " ")}` : `Default ${perUnit} h per unit (no history)`, component_ref: comp.ref }));
+      const installTotal = r2(hours * installRate);
+      lines.push(line({ section_ref: section.ref, grp: "SERVICES", part_number: l.part_number, description: `${ACTIVITY_LABELS.INSTALL}: ${l.description}`, qty: l.qty, unit_price: l.qty > 0 ? r2(installTotal / l.qty) : installTotal, total: installTotal, is_existing: false, activity: "INSTALL", hours, rate: installRate, basis: "rate_card", source_job_number: level === "none" ? null : labourSource, confidence: conf, note: level === "part" ? `${perUnit} h per unit from this part's history` : level === "category" ? `${perUnit} h per unit, median for ${cat.replace(/_/g, " ")}` : `Default ${perUnit} h per unit (no history)`, component_ref: comp.ref }));
     }
 
     // ---- Labour: CABLING-INSTALL from the template's ratio to equipment value ----

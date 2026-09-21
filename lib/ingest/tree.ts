@@ -239,20 +239,3 @@ export function leafSum(rows: TreeLine[]): number {
   }
   return effectiveSum(rows.filter((r) => !r.parent_ref), children);
 }
-
-/** Refs of parents whose children are a per-unit breakdown (qty x children = total). */
-export function perUnitParents(rows: TreeLine[]): Set<string> {
-  const children = new Map<string, TreeLine[]>();
-  for (const r of rows) {
-    if (!r.parent_ref) continue;
-    const arr = children.get(r.parent_ref) ?? [];
-    arr.push(r);
-    children.set(r.parent_ref, arr);
-  }
-  const out = new Set<string>();
-  for (const [ref, kids] of children) {
-    const parent = rows.find((r) => r.ref === ref)!;
-    if (parentMatches(parent, effectiveSum(kids, children)) === "per_unit") out.add(ref);
-  }
-  return out;
-}
