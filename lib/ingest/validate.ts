@@ -1,7 +1,7 @@
 import type { ExtractedJob } from "@/lib/schemas/extraction";
 import type { ParentMismatch, ProcessedLine, ProcessedSection, SectionValidation, ValidationReport } from "./types";
 import { cents, sum, TOLERANCE, within } from "./money";
-import { norm } from "./tree";
+import { norm, parentMatches } from "./tree";
 
 /**
  * Arithmetic validation: leaves -> parents -> section totals -> subtotal -> GST.
@@ -29,7 +29,7 @@ export function validate(
       const p = byRef.get(ref);
       if (!p) continue;
       const children_sum = sum(kids.map((k) => k.total));
-      if (!within(p.total, children_sum, TOLERANCE.line)) {
+      if (parentMatches({ total: p.total ?? 0, qty: p.qty }, children_sum) === null) {
         parent_mismatches.push({
           ref,
           description: p.description,

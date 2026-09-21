@@ -105,7 +105,17 @@ export function treeFromDepth(rows: ExtractedLineItem[]): TreeLine[] | null {
   return out;
 }
 
-/** Every parent's total must equal the sum of its direct children within the line tolerance. */
+/**
+ * A parent reconciles when its total equals the sum of its children, or, for a
+ * qty > 1 assembly whose parts are listed once per unit, qty x that sum.
+ */
+export function parentMatches(parent: { total: number; qty: number }, childrenSum: number): "sum" | "per_unit" | null {
+  if (within(parent.total, childrenSum, TOLERANCE.line)) return "sum";
+  if (parent.qty > 1 && within(parent.total, childrenSum * parent.qty, TOLERANCE.line * parent.qty)) return "per_unit";
+  return null;
+}
+
+/** Every parent must reconcile with its direct children (see parentMatches). */
 export function parentsReconcile(lines: TreeLine[]): boolean {
   const byRef = new Map(lines.map((l) => [l.ref, l]));
   const children = new Map<string, TreeLine[]>();
@@ -118,9 +128,28 @@ export function parentsReconcile(lines: TreeLine[]): boolean {
   }
   for (const [ref, kids] of children) {
     const parent = byRef.get(ref)!;
-    if (!within(parent.total, sum(kids.map((k) => k.total)), TOLERANCE.line)) return false;
+    if (parentMatches(parent, effectiveSum(kids, children)) === null) return false;
   }
   return true;
+}
+
+/**
+ * Effective value of a set of rows: leaves count as printed; a parent counts
+ * as the effective sum of its children, or as its own total when the children
+ * are a per-unit breakdown (qty x children = total).
+ */
+function effectiveSum(rows: TreeLine[], children: Map<string, TreeLine[]>): number {
+  let acc = 0;
+  for (const r of rows) {
+    const kids = children.get(r.ref);
+    if (!kids || kids.length === 0) {
+      acc += r.total;
+      continue;
+    }
+    const kidSum = effectiveSum(kids, children);
+    acc += parentMatches(r, kidSum) === "per_unit" ? r.total : kidSum;
+  }
+  return sum([acc]);
 }
 
 function isCode(line: ExtractedLineItem): boolean {
@@ -159,11 +188,20 @@ export function inferTreeFromSums(rows: ExtractedLineItem[]): TreeLine[] {
   function tryChildren(row: TreeLine, start: number): { next: number } | null {
     if (typeof row.total !== "number" || row.total <= 0) return null;
     const code = isCode(row);
-    if (!code && !row.is_rollup && row.qty !== 1) return null;
+    if (!code && !row.is_rollup && row.qty !== 1) {
+      // qty > 1 assembly with a per-unit breakdown: children sum to total / qty
+      if (row.qty > 1 && row.is_rollup) return attempt(row, start, row.total / row.qty, code);
+      return null;
+    }
+    if (start >= out.length) return null;
+    return attempt(row, start, row.total, code) ?? (row.qty > 1 ? attempt(row, start, row.total / row.qty, code) : null);
+  }
+
+  function attempt(row: TreeLine, start: number, target: number, code: boolean): { next: number } | null {
     if (start >= out.length) return null;
     // Save state so a failed attempt can be rolled back.
     const snapshot = out.slice(start).map((r) => r.parent_ref);
-    const res = consume(start, row.total, row.ref, code);
+    const res = consume(start, target, row.ref, code);
     const count = res.next - start;
     const minChildren = code || row.is_rollup ? 1 : 2;
     if (res.ok && count >= minChildren) return { next: res.next };
@@ -190,7 +228,31 @@ export function buildSectionTree(rows: ExtractedLineItem[]): TreeLine[] {
   return inferTreeFromSums(rows);
 }
 
+/** Section value from the tree: children replace parents, except per-unit breakdowns (see effectiveSum). */
 export function leafSum(rows: TreeLine[]): number {
-  const parents = new Set(rows.filter((r) => r.parent_ref).map((r) => r.parent_ref));
-  return sum(rows.filter((r) => !parents.has(r.ref)).map((r) => r.total));
+  const children = new Map<string, TreeLine[]>();
+  for (const r of rows) {
+    if (!r.parent_ref) continue;
+    const arr = children.get(r.parent_ref) ?? [];
+    arr.push(r);
+    children.set(r.parent_ref, arr);
+  }
+  return effectiveSum(rows.filter((r) => !r.parent_ref), children);
+}
+
+/** Refs of parents whose children are a per-unit breakdown (qty x children = total). */
+export function perUnitParents(rows: TreeLine[]): Set<string> {
+  const children = new Map<string, TreeLine[]>();
+  for (const r of rows) {
+    if (!r.parent_ref) continue;
+    const arr = children.get(r.parent_ref) ?? [];
+    arr.push(r);
+    children.set(r.parent_ref, arr);
+  }
+  const out = new Set<string>();
+  for (const [ref, kids] of children) {
+    const parent = rows.find((r) => r.ref === ref)!;
+    if (parentMatches(parent, effectiveSum(kids, children)) === "per_unit") out.add(ref);
+  }
+  return out;
 }
