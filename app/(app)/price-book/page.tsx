@@ -13,6 +13,8 @@ import { formatAud } from "@/lib/utils";
 import type { LabourStandardRow, PartRow } from "@/lib/supabase/types";
 
 export const metadata = { title: "Price Book" };
+// Rebuild embeds jobs one per request with 20 s spacing (Voyage free-tier limits).
+export const maxDuration = 300;
 
 async function load(q: string): Promise<{ parts: PartRow[]; standards: LabourStandardRow[]; error?: string }> {
   if (!supabaseConfigured()) return { parts: [], standards: [], error: "Supabase is not configured." };
