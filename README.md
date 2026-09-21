@@ -52,6 +52,22 @@ policies: all access is server-side via the service role key), creates the priva
 storage bucket, seeds `rate_card` with the hypothesis rates, and installs a stub `match_jobs`
 function that Phase 2 replaces.
 
+## Knowledge layer, matching and drafting (Phases 2–4)
+- `lib/knowledge/`: price book (latest price per part, custom items keyed by category), labour standards
+  (hours per unit per part, category medians, DE-COMM dollars per item) and section profiles (roll-up values and
+  activity hours per real section). `Rebuild from library` on the Price Book page recomputes them and, with a
+  Voyage key, embeds every job.
+- `lib/match/score.ts`: hybrid similarity — weighted cost-driver params (50%), scope embedding or keyword
+  overlap (30%), equipment category overlap (20%); room type acts as a filter. Returns the top 3 with reasons.
+- `lib/draft/`: brief → spec (Claude), part choice among price-book candidates (Claude), then a deterministic
+  builder prices equipment from the price book, labour as hours × rate card, cabling/consumables/freight as ratios
+  of section equipment value from the templating section, and overheads from the template's activity hours
+  scaled by equipment value. Every line carries basis, source job and confidence. Claude then drafts scope,
+  assumptions and exclusions from the lines and the matched jobs' text; mentions are validated against the lines.
+- `lib/draft/compare.ts`: Draft vs Actual against a holdout job.
+- `npm run demo` runs the whole pipeline locally from `seed/out` and prints the 6427 comparison;
+  `npm run knowledge` prints the derived tables.
+
 ## Password gate
 `proxy.ts` redirects every page to `/login` unless the session cookie matches a hash of
 `DEMO_PASSWORD`. If `DEMO_PASSWORD` is unset the gate is open (handy for local dev; always set

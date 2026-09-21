@@ -20,6 +20,8 @@ const args = new Set(process.argv.slice(2));
 const FORCE = args.has("--force");
 const DRY = args.has("--dry");
 const OFFLINE = args.has("--offline");
+const HOLDOUT_MODE = args.has("--holdout"); // ingest the holdout job (6427) flagged is_holdout
+const ONLY = [...args].find((a) => a.startsWith("--only="))?.slice(7) ?? null;
 const OUT_DIR = path.join(process.cwd(), "seed", "out");
 
 const DOCS_DIR = path.join(process.cwd(), "seed", "docs");
@@ -41,7 +43,8 @@ async function main() {
 
   const files = (await readdir(DOCS_DIR).catch(() => [] as string[]))
     .filter((f) => detectKind(f) !== null)
-    .filter((f) => !f.includes(HOLDOUT));
+    .filter((f) => (HOLDOUT_MODE ? f.includes(HOLDOUT) : !f.includes(HOLDOUT)))
+    .filter((f) => (ONLY ? f.includes(ONLY) : true));
   if (files.length === 0) {
     console.error(`No proposals found in ${DOCS_DIR}. See seed/README.md.`);
     process.exit(1);
@@ -88,7 +91,7 @@ async function main() {
       if (DRY) continue;
       if (OFFLINE) {
         const outFile = path.join(OUT_DIR, file.replace(/\.(pdf|docx)$/i, "") + ".json");
-        await writeFile(outFile, JSON.stringify({ file, kind, validation: v, meta: out.meta, raw: out.raw, processed: job, payload: buildSavePayload(job) }, null, 2));
+        await writeFile(outFile, JSON.stringify({ file, kind, validation: v, meta: out.meta, raw: out.raw, processed: job, payload: buildSavePayload(job, { isHoldout: HOLDOUT_MODE }) }, null, 2));
         console.log(`   → wrote ${path.relative(process.cwd(), outFile)}${v.ok ? "" : " (does not reconcile)"}\n`);
         continue;
       }
@@ -104,7 +107,7 @@ async function main() {
         .select("id")
         .single();
       if (error || !doc) throw new Error(error?.message ?? "document insert failed");
-      const jobId = await sv!.saveProcessedJob(job, { documentId: doc.id, isHoldout: false });
+      const jobId = await sv!.saveProcessedJob(job, { documentId: doc.id, isHoldout: HOLDOUT_MODE });
       console.log(`   ✓ saved job ${jobId}\n`);
     } catch (e) {
       failures += 1;

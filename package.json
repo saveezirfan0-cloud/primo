@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx --conditions=react-server scripts/seed.ts",
     "test": "vitest run",
-    "reprocess": "tsx scripts/reprocess.ts"
+    "reprocess": "tsx scripts/reprocess.ts",
+    "demo": "tsx scripts/demo.ts",
+    "knowledge": "tsx scripts/knowledge.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

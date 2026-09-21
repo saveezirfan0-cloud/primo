@@ -94,6 +94,7 @@ export type PartRow = {
   last_price: number | null;
   last_seen: string | null;
   times_used: number;
+  jobs: string[];
   updated_at: string;
 };
 
@@ -112,9 +113,29 @@ export type LabourStandardRow = {
   category: string | null;
   activity: string;
   hours: number;
+  amount: number | null;
   sample_count: number;
   updated_at: string;
 };
+
+export type SectionProfileRow = {
+  id: string;
+  job_number: string;
+  job_title: string;
+  section_name: string;
+  section_kind: string;
+  section_total: number;
+  equipment_value: number;
+  cabling: number;
+  cons: number;
+  freight: number;
+  services: number;
+  activities: Json;
+  categories: string[];
+  updated_at: string;
+};
+
+export type IngestStagingRow = { key: string; seq: number; chunk: string };
 
 export type EstimateRow = {
   id: string;
@@ -152,11 +173,17 @@ export type Database = {
       rate_card: Table<RateCardRow, "code" | "label">;
       labour_standards: Table<LabourStandardRow, "activity" | "hours">;
       estimates: Table<EstimateRow, "brief_text">;
+      section_profiles: Table<SectionProfileRow, "job_number" | "job_title" | "section_name" | "section_kind" | "section_total" | "equipment_value" | "cabling" | "cons" | "freight" | "services">;
+      ingest_staging: Table<IngestStagingRow, "key" | "seq" | "chunk">;
     };
     Views: Record<string, never>;
     Functions: {
       save_job: {
         Args: { p: Json };
+        Returns: string;
+      };
+      save_job_from_staging: {
+        Args: { p_key: string };
         Returns: string;
       };
       match_jobs: {
