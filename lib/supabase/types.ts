@@ -155,6 +155,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      save_job: {
+        Args: { p: Json };
+        Returns: string;
+      };
       match_jobs: {
         Args: {
           p_spec: Json;

@@ -168,7 +168,7 @@ create table if not exists public.rate_card (
 insert into public.rate_card (code, label, rate, unit, notes) values
   ('INSTALL',         'Installation',                 95.10, 'hour', 'Hypothesis from 6570: 47.55 = 0.5h, 57.06 = 0.6h, 190.20 = 2h per speaker. Verify with estimator.'),
   ('CABLING-INSTALL', 'Cabling installation',         95.10, 'hour', 'Hypothesis from 6570: 9.51/m = 0.1h per metre.'),
-  ('DE-COMM',         'Decommissioning',              95.10, 'hour', 'Observed values (30.91, 61.82) do not divide cleanly by 95.10; treated as a dollar amount per item until verified.'),
+  ('DE-COMM',         'Decommissioning',               null, 'item', 'Observed values (30.91, 61.82) do not divide cleanly by 95.10; treated as a dollar amount per item until verified with the estimator.'),
   ('RACK-BUILD',      'Rack build',                   95.10, 'hour', 'Assumed same trade rate as INSTALL. Unverified.'),
   ('ENGINEER',        'Engineering / design',        138.00, 'hour', 'Hypothesis from 6570: 552 = 4h, 1656 = 12h.'),
   ('DOCUMENT',        'Documentation',               138.00, 'hour', 'Hypothesis from 6570.'),
